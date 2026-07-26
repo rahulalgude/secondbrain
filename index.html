@@ -327,7 +327,9 @@
   <p class="subtitle">Sign in to sync your notes across devices.</p>
   <div class="auth-form">
     <input type="email" id="authEmail" placeholder="you@email.com" autocomplete="email" />
-    <button id="sendLinkBtn">Send magic link</button>
+    <input type="password" id="authPassword" placeholder="Password" autocomplete="current-password" />
+    <button id="signInBtn">Sign in</button>
+    <button id="signUpBtn" style="background: transparent; color: var(--teal); border: 1px solid var(--card-border);">Create account</button>
   </div>
   <div class="auth-status" id="authStatus"></div>
 </div>
@@ -395,8 +397,8 @@
    The anon key is safe to expose publicly: it only grants access
    allowed by your Row Level Security policies (see setup guide).
    ========================================================= */
-const SUPABASE_URL = 'https://efyglommctzkpzdmocrt.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVmeWdsb21tY3R6a3B6ZG1vY3J0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ5OTE4ODEsImV4cCI6MjEwMDU2Nzg4MX0.21k7WKHakDjHlTAeXMzUvlA4XeQCVwhHwIEEfy3RRYM';
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
 
 const API_KEY_STORAGE = 'secondbrain_gemini_key';
 
@@ -418,34 +420,59 @@ function showApp() {
   document.getElementById('appRoot').classList.remove('hidden');
 }
 
-async function sendMagicLink() {
-  const email = document.getElementById('authEmail').value.trim();
+function getAuthFields() {
+  return {
+    email: document.getElementById('authEmail').value.trim(),
+    password: document.getElementById('authPassword').value
+  };
+}
+
+function setAuthStatus(text, isError) {
   const statusEl = document.getElementById('authStatus');
-  const btn = document.getElementById('sendLinkBtn');
-  if (!email) {
-    statusEl.textContent = 'Enter your email first.';
-    statusEl.classList.add('error');
-    return;
-  }
+  statusEl.textContent = text;
+  statusEl.classList.toggle('error', !!isError);
+}
+
+async function handleSignIn() {
+  const { email, password } = getAuthFields();
+  if (!email || !password) return setAuthStatus('Enter both email and password.', true);
+
+  const btn = document.getElementById('signInBtn');
   btn.disabled = true;
-  statusEl.classList.remove('error');
-  statusEl.textContent = 'Sending link...';
-  const { error } = await supabaseClient.auth.signInWithOtp({
-    email,
-    options: { emailRedirectTo: window.location.href }
-  });
+  setAuthStatus('Signing in...');
+
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+  btn.disabled = false;
+  if (error) setAuthStatus(error.message, true);
+}
+
+async function handleSignUp() {
+  const { email, password } = getAuthFields();
+  if (!email || !password) return setAuthStatus('Enter both email and password.', true);
+  if (password.length < 6) return setAuthStatus('Password must be at least 6 characters.', true);
+
+  const btn = document.getElementById('signUpBtn');
+  btn.disabled = true;
+  setAuthStatus('Creating account...');
+
+  const { data, error } = await supabaseClient.auth.signUp({ email, password });
+
   btn.disabled = false;
   if (error) {
-    statusEl.textContent = error.message;
-    statusEl.classList.add('error');
+    setAuthStatus(error.message, true);
+  } else if (data.session) {
+    // Email confirmation is off — signed in immediately.
+    setAuthStatus('');
   } else {
-    statusEl.textContent = `Check ${email} for a sign-in link.`;
+    setAuthStatus('Account created. Check your email to confirm, then sign in.');
   }
 }
 
-document.getElementById('sendLinkBtn').addEventListener('click', sendMagicLink);
-document.getElementById('authEmail').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') sendMagicLink();
+document.getElementById('signInBtn').addEventListener('click', handleSignIn);
+document.getElementById('signUpBtn').addEventListener('click', handleSignUp);
+document.getElementById('authPassword').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') handleSignIn();
 });
 
 async function handleSignOut() {
