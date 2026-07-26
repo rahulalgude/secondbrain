@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Second Brain</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --bg: #1c1b19;
+    --bg-raised: #242220;
+    --card: #2a2825;
+    --card-border: #3a3733;
+    --ink: #ede8de;
+    --ink-dim: #a8a297;
+    --ink-faint: #6f6a5f;
+    --amber: #d9a441;
+    --teal: #5aa8a0;
+    --rust: #c17a5a;
+    --sage: #8ba888;
+    --danger: #c1615a;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 640px;
+    padding: 24px 16px 80px;
+  }
+
+  header { margin-bottom: 20px; }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-optical-sizing: auto;
+    font-weight: 600;
+    font-size: 2rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle { color: var(--ink-dim); font-size: 0.9rem; margin: 0; }
+
+  .gear-btn {
+    position: absolute;
+    top: 20px;
+    right: 16px;
+    background: none;
+    border: none;
+    color: var(--ink-dim);
+    font-size: 1.3rem;
+    cursor: pointer;
+    padding: 8px;
+    line-height: 1;
+  }
+  .gear-btn:hover { color: var(--ink); }
+
+  /* --- Auth screen --- */
+  .auth-screen {
+    max-width: 400px;
+    margin: 15vh auto 0;
+    padding: 0 16px;
+    text-align: center;
+  }
+  .auth-screen h1 { text-align: center; }
+  .auth-screen p.subtitle { margin-bottom: 28px; }
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+  }
+  .auth-form input {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--ink);
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .auth-form input:focus { outline: 1px solid var(--teal); }
+  .auth-form button {
+    background: var(--teal);
+    color: #14201e;
+    border: none;
+    border-radius: 10px;
+    padding: 12px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .auth-form button:disabled { opacity: 0.5; }
+  .auth-status {
+    margin-top: 14px;
+    font-size: 0.82rem;
+    color: var(--ink-dim);
+    line-height: 1.5;
+  }
+  .auth-status.error { color: var(--danger); }
+
+  /* Ask panel */
+  .ask-panel {
+    background: var(--bg-raised);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .ask-row { display: flex; gap: 8px; }
+  .ask-row input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--ink);
+    font-size: 0.95rem;
+    font-family: inherit;
+  }
+  .ask-row input:focus { outline: 1px solid var(--teal); }
+  .ask-btn {
+    background: var(--teal);
+    color: #14201e;
+    border: none;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .ask-btn:disabled { opacity: 0.5; cursor: default; }
+  .ask-btn:focus-visible, .ask-row input:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+  .answer-box {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--card-border);
+    font-size: 0.95rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+  }
+  .answer-sources {
+    margin-top: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    color: var(--ink-faint);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .source-chip {
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 2px 8px;
+  }
+
+  /* Capture bar */
+  .capture { display: flex; flex-direction: column; gap: 10px; margin-bottom: 22px; }
+  .capture-row { display: flex; gap: 8px; }
+  textarea.capture-input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: var(--ink);
+    font-size: 1rem;
+    font-family: inherit;
+    resize: none;
+    min-height: 46px;
+    max-height: 140px;
+  }
+  textarea.capture-input:focus { outline: 1px solid var(--amber); }
+  .capture-controls { display: flex; gap: 8px; align-items: center; }
+  select.category-select {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    color: var(--ink);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+  }
+  .add-btn {
+    background: var(--amber);
+    color: #2a1e08;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    flex: 1;
+  }
+  .add-btn:disabled { opacity: 0.5; }
+  .add-btn:focus-visible, select:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* Filters */
+  .filters { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter-chip {
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--ink-dim);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 0.78rem;
+    font-family: 'IBM Plex Mono', monospace;
+    cursor: pointer;
+  }
+  .filter-chip.active { color: var(--bg); border-color: transparent; }
+  .filter-chip[data-cat="all"].active { background: var(--ink-dim); }
+  .filter-chip[data-cat="task"].active { background: var(--teal); }
+  .filter-chip[data-cat="reminder"].active { background: var(--rust); }
+  .filter-chip[data-cat="shopping"].active { background: var(--sage); }
+  .filter-chip[data-cat="note"].active { background: var(--amber); }
+
+  /* Entry cards */
+  .entries { display: flex; flex-direction: column; gap: 10px; }
+  .entry-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-left: 4px solid var(--ink-faint);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    animation: fadeIn 0.25s ease;
+  }
+  .entry-card.cat-task { border-left-color: var(--teal); }
+  .entry-card.cat-reminder { border-left-color: var(--rust); }
+  .entry-card.cat-shopping { border-left-color: var(--sage); }
+  .entry-card.cat-note { border-left-color: var(--amber); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  .entry-check { margin-top: 2px; width: 18px; height: 18px; accent-color: var(--teal); cursor: pointer; flex-shrink: 0; }
+  .entry-body { flex: 1; min-width: 0; }
+  .entry-text { font-size: 0.95rem; line-height: 1.4; word-wrap: break-word; }
+  .entry-text.done { text-decoration: line-through; color: var(--ink-faint); }
+  .entry-meta {
+    margin-top: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--ink-faint);
+    display: flex;
+    gap: 8px;
+  }
+  .entry-delete { background: none; border: none; color: var(--ink-faint); cursor: pointer; font-size: 1rem; padding: 4px; flex-shrink: 0; }
+  .entry-delete:hover { color: var(--danger); }
+  .empty-state { text-align: center; color: var(--ink-faint); padding: 40px 20px; font-size: 0.9rem; }
+
+  /* Settings modal */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 10;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--bg-raised);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 20px;
+    max-width: 420px;
+    width: 100%;
+  }
+  .modal h2 { font-family: 'Fraunces', serif; font-size: 1.2rem; margin: 0 0 4px; }
+  .modal p { color: var(--ink-dim); font-size: 0.85rem; line-height: 1.5; margin: 0 0 12px; }
+  .modal input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: var(--ink);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    margin-bottom: 12px;
+  }
+  .modal a { color: var(--teal); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .modal-btn { border: none; border-radius: 8px; padding: 8px 16px; font-family: inherit; font-size: 0.85rem; cursor: pointer; }
+  .modal-btn.save { background: var(--amber); color: #2a1e08; font-weight: 600; }
+  .modal-btn.cancel { background: transparent; color: var(--ink-dim); }
+  .modal-btn.signout { background: transparent; color: var(--danger); }
+
+  .status-line { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: var(--ink-faint); margin-top: 8px; }
+
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .entry-card { animation: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen" id="authScreen">
+  <h1>Second Brain</h1>
+  <p class="subtitle">Sign in to sync your notes across devices.</p>
+  <div class="auth-form">
+    <input type="email" id="authEmail" placeholder="you@email.com" autocomplete="email" />
+    <button id="sendLinkBtn">Send magic link</button>
+  </div>
+  <div class="auth-status" id="authStatus"></div>
+</div>
+
+<!-- MAIN APP -->
+<div class="app hidden" id="appRoot">
+  <header style="position: relative;">
+    <h1>Second Brain</h1>
+    <p class="subtitle">Dump it here. Ask it later.</p>
+    <button class="gear-btn" id="settingsBtn" aria-label="Settings">⚙</button>
+  </header>
+
+  <div class="ask-panel">
+    <div class="ask-row">
+      <input type="text" id="askInput" placeholder="Ask anything — what's on my shopping list?" />
+      <button class="ask-btn" id="askBtn">Ask</button>
+    </div>
+    <div id="answerArea"></div>
+  </div>
+
+  <div class="capture">
+    <div class="capture-row">
+      <textarea class="capture-input" id="captureInput" placeholder="Add a task, reminder, shopping item, or note..." rows="1"></textarea>
+    </div>
+    <div class="capture-controls">
+      <select class="category-select" id="categorySelect">
+        <option value="task">Task</option>
+        <option value="reminder">Reminder</option>
+        <option value="shopping">Shopping</option>
+        <option value="note">Note</option>
+      </select>
+      <button class="add-btn" id="addBtn">Add</button>
+    </div>
+  </div>
+
+  <div class="filters" id="filters">
+    <button class="filter-chip active" data-cat="all">All</button>
+    <button class="filter-chip" data-cat="task">Tasks</button>
+    <button class="filter-chip" data-cat="reminder">Reminders</button>
+    <button class="filter-chip" data-cat="shopping">Shopping</button>
+    <button class="filter-chip" data-cat="note">Notes</button>
+  </div>
+
+  <div class="entries" id="entries">
+    <div class="empty-state">Loading your notes...</div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="settingsModal">
+  <div class="modal">
+    <h2>Settings</h2>
+    <p>Your Gemini API key is stored only in this browser's local storage (not synced). Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.</p>
+    <input type="password" id="apiKeyInput" placeholder="AIza..." />
+    <div class="modal-actions">
+      <button class="modal-btn signout" id="signOutBtn">Sign out</button>
+      <button class="modal-btn cancel" id="cancelSettings">Cancel</button>
+      <button class="modal-btn save" id="saveSettings">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   CONFIG — fill these in with your own Supabase project values.
+   The anon key is safe to expose publicly: it only grants access
+   allowed by your Row Level Security policies (see setup guide).
+   ========================================================= */
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+const API_KEY_STORAGE = 'secondbrain_gemini_key';
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let entries = [];
+let activeFilter = 'all';
+let currentUser = null;
+
+/* ---------------- AUTH ---------------- */
+
+function showAuthScreen() {
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('appRoot').classList.add('hidden');
+}
+
+function showApp() {
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('appRoot').classList.remove('hidden');
+}
+
+async function sendMagicLink() {
+  const email = document.getElementById('authEmail').value.trim();
+  const statusEl = document.getElementById('authStatus');
+  const btn = document.getElementById('sendLinkBtn');
+  if (!email) {
+    statusEl.textContent = 'Enter your email first.';
+    statusEl.classList.add('error');
+    return;
+  }
+  btn.disabled = true;
+  statusEl.classList.remove('error');
+  statusEl.textContent = 'Sending link...';
+  const { error } = await supabaseClient.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.href }
+  });
+  btn.disabled = false;
+  if (error) {
+    statusEl.textContent = error.message;
+    statusEl.classList.add('error');
+  } else {
+    statusEl.textContent = `Check ${email} for a sign-in link.`;
+  }
+}
+
+document.getElementById('sendLinkBtn').addEventListener('click', sendMagicLink);
+document.getElementById('authEmail').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') sendMagicLink();
+});
+
+async function handleSignOut() {
+  await supabaseClient.auth.signOut();
+  entries = [];
+  document.getElementById('settingsModal').classList.remove('open');
+  showAuthScreen();
+}
+
+document.getElementById('signOutBtn').addEventListener('click', handleSignOut);
+
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  currentUser = session?.user || null;
+  if (currentUser) {
+    showApp();
+    loadEntries();
+  } else {
+    showAuthScreen();
+  }
+});
+
+/* ---------------- DATA (Supabase) ---------------- */
+
+async function loadEntries() {
+  const { data, error } = await supabaseClient
+    .from('entries')
+    .select('*')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    document.getElementById('entries').innerHTML =
+      `<div class="empty-state" style="color: var(--danger)">Couldn't load notes: ${escapeHtml(error.message)}</div>`;
+    return;
+  }
+  entries = data;
+  render();
+}
+
+async function addEntry() {
+  const input = document.getElementById('captureInput');
+  const text = input.value.trim();
+  if (!text) return;
+  const category = document.getElementById('categorySelect').value;
+
+  const addBtn = document.getElementById('addBtn');
+  addBtn.disabled = true;
+
+  const { data, error } = await supabaseClient
+    .from('entries')
+    .insert({ text, category, done: false })
+    .select()
+    .single();
+
+  addBtn.disabled = false;
+
+  if (error) {
+    alert('Could not save: ' + error.message);
+    return;
+  }
+  entries.unshift(data);
+  input.value = '';
+  input.style.height = 'auto';
+  render();
+}
+
+async function toggleEntry(id, currentDone) {
+  const { error } = await supabaseClient
+    .from('entries')
+    .update({ done: !currentDone })
+    .eq('id', id);
+  if (!error) {
+    const e = entries.find(x => x.id === id);
+    e.done = !currentDone;
+    render();
+  }
+}
+
+async function deleteEntry(id) {
+  const { error } = await supabaseClient.from('entries').delete().eq('id', id);
+  if (!error) {
+    entries = entries.filter(x => x.id !== id);
+    render();
+  }
+}
+
+/* ---------------- RENDER ---------------- */
+
+function formatDate(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function render() {
+  const container = document.getElementById('entries');
+  const visible = entries.filter(e => activeFilter === 'all' || e.category === activeFilter);
+
+  if (visible.length === 0) {
+    container.innerHTML = '<div class="empty-state">Nothing here yet. Add your first thing above.</div>';
+    return;
+  }
+
+  container.innerHTML = visible.map(e => `
+    <div class="entry-card cat-${e.category}" data-id="${e.id}">
+      ${e.category === 'task' || e.category === 'shopping'
+        ? `<input type="checkbox" class="entry-check" ${e.done ? 'checked' : ''} data-action="toggle" />`
+        : ''}
+      <div class="entry-body">
+        <div class="entry-text ${e.done ? 'done' : ''}">${escapeHtml(e.text)}</div>
+        <div class="entry-meta">
+          <span>${e.category}</span>
+          <span>${formatDate(e.created_at)}</span>
+        </div>
+      </div>
+      <button class="entry-delete" data-action="delete" aria-label="Delete">✕</button>
+    </div>
+  `).join('');
+}
+
+document.getElementById('entries').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  const card = e.target.closest('.entry-card');
+  const id = card.dataset.id;
+  const entry = entries.find(x => x.id === id);
+  if (btn.dataset.action === 'toggle') toggleEntry(id, entry.done);
+  else if (btn.dataset.action === 'delete') deleteEntry(id);
+});
+
+document.getElementById('filters').addEventListener('click', (e) => {
+  const chip = e.target.closest('.filter-chip');
+  if (!chip) return;
+  activeFilter = chip.dataset.cat;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  render();
+});
+
+document.getElementById('addBtn').addEventListener('click', addEntry);
+document.getElementById('captureInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    addEntry();
+  }
+});
+document.getElementById('captureInput').addEventListener('input', function () {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 140) + 'px';
+});
+
+/* ---------------- SETTINGS MODAL ---------------- */
+
+const modal = document.getElementById('settingsModal');
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  document.getElementById('apiKeyInput').value = localStorage.getItem(API_KEY_STORAGE) || '';
+  modal.classList.add('open');
+});
+document.getElementById('cancelSettings').addEventListener('click', () => modal.classList.remove('open'));
+document.getElementById('saveSettings').addEventListener('click', () => {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  localStorage.setItem(API_KEY_STORAGE, key);
+  modal.classList.remove('open');
+});
+
+/* ---------------- ASK AI ---------------- */
+
+async function askQuestion() {
+  const input = document.getElementById('askInput');
+  const question = input.value.trim();
+  if (!question) return;
+
+  const apiKey = localStorage.getItem(API_KEY_STORAGE);
+  const answerArea = document.getElementById('answerArea');
+
+  if (!apiKey) {
+    answerArea.innerHTML = '<div class="answer-box">Add your Gemini API key first (tap ⚙ above).</div>';
+    return;
+  }
+  if (entries.length === 0) {
+    answerArea.innerHTML = '<div class="answer-box">Nothing captured yet — add some notes first.</div>';
+    return;
+  }
+
+  const askBtn = document.getElementById('askBtn');
+  askBtn.disabled = true;
+  askBtn.textContent = '...';
+  answerArea.innerHTML = '<div class="status-line">Thinking...</div>';
+
+  const contextBlock = entries
+    .map(e => `[id:${e.id}] (${e.category}${e.done ? ', done' : ''}, ${formatDate(e.created_at)}) ${e.text}`)
+    .join('\n');
+
+  const prompt = `You are a helpful assistant answering questions about the user's personal notes, tasks, reminders, and shopping lists ("second brain"). Below is every entry they've saved, each with an id, category, status, and date.
+
+ENTRIES:
+${contextBlock}
+
+USER QUESTION: ${question}
+
+Answer the question directly and concisely using only the entries above. If relevant, mention specific items. At the very end, on a new line, output SOURCES: followed by a comma-separated list of the entry ids you actually used (e.g. SOURCES: id1,id2). If none are relevant, say so plainly and still include an empty SOURCES: line.`;
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`API error ${response.status}: ${errText.slice(0, 200)}`);
+    }
+
+    const data = await response.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || 'No answer returned.';
+
+    const sourcesMatch = rawText.match(/SOURCES:\s*(.*)$/is);
+    const mainText = rawText.replace(/SOURCES:\s*.*/is, '').trim();
+    const sourceIds = sourcesMatch
+      ? sourcesMatch[1].split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+
+    let sourcesHtml = '';
+    if (sourceIds.length > 0) {
+      const chips = sourceIds
+        .map(id => entries.find(e => e.id === id))
+        .filter(Boolean)
+        .map(e => `<span class="source-chip">${escapeHtml(e.text.slice(0, 30))}${e.text.length > 30 ? '…' : ''}</span>`)
+        .join('');
+      if (chips) sourcesHtml = `<div class="answer-sources">${chips}</div>`;
+    }
+
+    answerArea.innerHTML = `<div class="answer-box">${escapeHtml(mainText)}${sourcesHtml}</div>`;
+  } catch (err) {
+    answerArea.innerHTML = `<div class="answer-box" style="color: var(--danger)">Something went wrong: ${escapeHtml(err.message)}</div>`;
+  } finally {
+    askBtn.disabled = false;
+    askBtn.textContent = 'Ask';
+  }
+}
+
+document.getElementById('askBtn').addEventListener('click', askQuestion);
+document.getElementById('askInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') askQuestion();
+});
+</script>
+</body>
+</html>
